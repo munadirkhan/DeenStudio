@@ -192,6 +192,13 @@ function StepIndicator({ step }) {
 }
 
 export default function App() {
+  const MOTION_EFFECTS = [
+    { id: "none", label: "None" },
+    { id: "zoom", label: "Zoom In" },
+    { id: "pan", label: "Slow Pan" },
+    { id: "parallax", label: "Parallax" },
+  ];
+
   const [step, setStep] = useState(1);
   const [ayah, setAyah] = useState("");
   const [translation, setTranslation] = useState("");
@@ -200,6 +207,7 @@ export default function App() {
   const [ayahNumber, setAyahNumber] = useState("1");
   const [reciterId, setReciterId] = useState("1");
   const [clipSeconds, setClipSeconds] = useState(8);
+  const [motionEffect, setMotionEffect] = useState("none");
   const [quranLines, setQuranLines] = useState([]);
   const [lineStartAyahNo, setLineStartAyahNo] = useState(1);
   const [recitationUrl, setRecitationUrl] = useState("");
@@ -320,9 +328,29 @@ export default function App() {
     const W = canvas.width;
     const H = canvas.height;
     const T = selectedTemplate;
+    const motionProgress = durationMs > 0 ? Math.max(0, Math.min(1, elapsedMs / durationMs)) : 0;
 
     if (bgImageEl) {
-      ctx.drawImage(bgImageEl, 0, 0, W, H);
+      let scale = 1;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (motionEffect === "zoom") {
+        scale = 1 + 0.2 * motionProgress;
+      } else if (motionEffect === "pan") {
+        scale = 1.08;
+        offsetX = -40 + 80 * motionProgress;
+      } else if (motionEffect === "parallax") {
+        scale = 1.12;
+        offsetX = -24 + 48 * motionProgress;
+        offsetY = Math.sin(motionProgress * Math.PI * 2) * 6;
+      }
+
+      const drawW = W * scale;
+      const drawH = H * scale;
+      const baseX = (W - drawW) / 2;
+      const baseY = (H - drawH) / 2;
+      ctx.drawImage(bgImageEl, baseX + offsetX, baseY + offsetY, drawW, drawH);
       ctx.fillStyle = "rgba(0,0,0,0.35)";
       ctx.fillRect(0, 0, W, H);
     } else {
@@ -953,6 +981,18 @@ export default function App() {
                   {selectedTemplate?.id === t.id && <span className="text-xs bg-amber-400 text-black px-2 py-0.5 rounded-full font-bold">Selected</span>}
                 </button>
               ))}
+            </div>
+            <div className="deen-panel p-4 max-w-md mx-auto mb-6">
+              <p className="text-xs text-slate-400 uppercase tracking-wide font-bold mb-3">Motion Effect</p>
+              <select
+                className="w-full bg-slate-900/80 border border-slate-600/60 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400/70"
+                value={motionEffect}
+                onChange={(e) => setMotionEffect(e.target.value)}
+              >
+                {MOTION_EFFECTS.map((effect) => (
+                  <option key={effect.id} value={effect.id}>{effect.label}</option>
+                ))}
+              </select>
             </div>
             <div className="flex gap-3 max-w-sm mx-auto">
               <button onClick={() => setStep(1)} className="flex-1 deen-panel py-3 rounded-xl text-sm text-slate-300 hover:border-slate-500 transition-all">← Back</button>
