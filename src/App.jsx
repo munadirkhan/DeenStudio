@@ -67,6 +67,22 @@ async function fetchWithTimeout(url, ms, label) {
 
 function buildLocalHabibiSuggestion(userText) {
   const text = (userText || "").toLowerCase();
+  if (
+    text.includes("passed away") ||
+    text.includes("pass away") ||
+    text.includes("death") ||
+    text.includes("died") ||
+    text.includes("lost") ||
+    text.includes("funeral") ||
+    text.includes("janazah") ||
+    text.includes("grandfather") ||
+    text.includes("grandmother") ||
+    text.includes("father") ||
+    text.includes("mother") ||
+    text.includes("brother") ||
+    text.includes("sister")
+  )
+    return { surahNo: "2", ayahNo: "156", reason: "Surah Al-Baqarah 2:156 reminds us we belong to Allah and return to Him.", tip: "Use a gentle, consoling tone and keep visuals calm." };
   if (text.includes("sad") || text.includes("depress") || text.includes("grief"))
     return { surahNo: "94", ayahNo: "5", reason: "Surah Ash-Sharh brings hope and relief after hardship.", tip: "Pair it with calming visuals for maximum impact." };
   if (text.includes("anxious") || text.includes("worry") || text.includes("stress") || text.includes("fear"))
@@ -466,14 +482,38 @@ export default function App() {
     setHabibiAnswer("");
     try {
       if (!browserOpenAI) {
-        const fallback = buildLocalHabibiSuggestion(habibiPrompt);
-        setHabibiAnswer(`Suggestion: Surah ${fallback.surahNo}:${fallback.ayahNo}. ${fallback.reason} Tip: ${fallback.tip}`);
         try {
-          await fetchSurahAndAutofill(fallback.surahNo, fallback.ayahNo);
+          const habibiRes = await Promise.race([
+            fetch("/api/habibi-advice", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt: habibiPrompt }),
+            }),
+            timeoutAfter(20000, "Habibi backend request"),
+          ]);
+          const habibiData = await parseApiResponse(habibiRes, "Habibi API request failed");
+          const fallback = buildLocalHabibiSuggestion(habibiPrompt);
+          const nextSurahNo = habibiData?.surahNo || fallback.surahNo;
+          const nextAyahNo = habibiData?.ayahNo || fallback.ayahNo;
+          const why = habibiData?.why || fallback.reason;
+          const tip = habibiData?.tip || fallback.tip;
+          setHabibiAnswer(`Suggestion: Surah ${nextSurahNo}:${nextAyahNo}. ${why} Tip: ${tip}`);
+          try {
+            await fetchSurahAndAutofill(nextSurahNo, nextAyahNo);
+          } catch {
+            // Keep the suggestion visible even if Quran API is temporarily unreachable.
+          }
+          return;
         } catch {
-          // Keep the suggestion visible even if Quran API is temporarily unreachable.
+          const fallback = buildLocalHabibiSuggestion(habibiPrompt);
+          setHabibiAnswer(`Suggestion: Surah ${fallback.surahNo}:${fallback.ayahNo}. ${fallback.reason} Tip: ${fallback.tip}`);
+          try {
+            await fetchSurahAndAutofill(fallback.surahNo, fallback.ayahNo);
+          } catch {
+            // Keep the suggestion visible even if Quran API is temporarily unreachable.
+          }
+          return;
         }
-        return;
       }
 
       const completion = await browserOpenAI.chat.completions.create({
