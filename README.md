@@ -147,21 +147,7 @@ DeenStudio/
 └── vite.config.js           # Vite configuration
 ```
 
-## 🚀 Deployment
-
 **Live on GitHub**: [munadirkhan/DeenStudio](https://github.com/munadirkhan/DeenStudio)
-
-### Deploy to Vercel (Recommended)
-```bash
-npm i -g vercel
-vercel
-```
-
-### Deploy to Netlify
-```bash
-npm run build
-# Drop dist/ folder into Netlify
-```
 
 ## 📄 License
 
