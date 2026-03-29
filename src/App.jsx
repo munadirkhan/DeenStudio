@@ -58,6 +58,13 @@ function timeoutAfter(ms, label) {
   });
 }
 
+async function fetchWithTimeout(url, ms, label) {
+  return Promise.race([
+    fetch(url),
+    timeoutAfter(ms, label),
+  ]);
+}
+
 function buildLocalHabibiSuggestion(userText) {
   const text = (userText || "").toLowerCase();
   if (text.includes("sad") || text.includes("depress") || text.includes("grief"))
@@ -244,7 +251,11 @@ export default function App() {
       throw new Error("Invalid Surah number.");
     }
 
-    const res = await fetch(`https://quranapi.pages.dev/api/${parsedSurahNo}.json`);
+    const res = await fetchWithTimeout(
+      `https://quranapi.pages.dev/api/${parsedSurahNo}.json`,
+      10000,
+      "Surah fetch",
+    );
     if (!res.ok) {
       throw new Error("Could not fetch surah from Quran API.");
     }
@@ -288,14 +299,19 @@ export default function App() {
 
     const startAyah = Math.max(1, Number.parseInt(ayahNumber, 10) || lineStartAyahNo || 1);
     const maxAyah = quranLines.length;
+    const endAyah = Math.min(maxAyah, startAyah + 11);
     const segments = [];
     let elapsed = 0;
 
-    for (let ayahNoCandidate = startAyah; ayahNoCandidate <= maxAyah; ayahNoCandidate++) {
+    for (let ayahNoCandidate = startAyah; ayahNoCandidate <= endAyah; ayahNoCandidate++) {
       if (elapsed >= durationSec) break;
 
       try {
-        const verseRes = await fetch(`https://quranapi.pages.dev/api/${parsedSurahNo}/${ayahNoCandidate}.json`);
+        const verseRes = await fetchWithTimeout(
+          `https://quranapi.pages.dev/api/${parsedSurahNo}/${ayahNoCandidate}.json`,
+          7000,
+          "Verse fetch",
+        );
         if (!verseRes.ok) break;
         const verseData = await verseRes.json();
         const reciterAudio = verseData?.audio?.[reciterId] || verseData?.audio?.["1"];
@@ -452,7 +468,11 @@ export default function App() {
       if (!browserOpenAI) {
         const fallback = buildLocalHabibiSuggestion(habibiPrompt);
         setHabibiAnswer(`Suggestion: Surah ${fallback.surahNo}:${fallback.ayahNo}. ${fallback.reason} Tip: ${fallback.tip}`);
-        await fetchSurahAndAutofill(fallback.surahNo, fallback.ayahNo);
+        try {
+          await fetchSurahAndAutofill(fallback.surahNo, fallback.ayahNo);
+        } catch {
+          // Keep the suggestion visible even if Quran API is temporarily unreachable.
+        }
         return;
       }
 
@@ -485,7 +505,11 @@ export default function App() {
       setHabibiAnswer(`Suggestion: Surah ${nextSurahNo}:${nextAyahNo}. ${why} Tip: ${tip}`);
     } catch {
       const fallback = buildLocalHabibiSuggestion(habibiPrompt);
-      await fetchSurahAndAutofill(fallback.surahNo, fallback.ayahNo);
+      try {
+        await fetchSurahAndAutofill(fallback.surahNo, fallback.ayahNo);
+      } catch {
+        // Keep fallback text response resilient in production network edge-cases.
+      }
       setHabibiAnswer(`Suggestion: Surah ${fallback.surahNo}:${fallback.ayahNo}. ${fallback.reason} Tip: ${fallback.tip}`);
     } finally {
       setHabibiBusy(false);
@@ -729,7 +753,10 @@ export default function App() {
     const durationMs = Math.max(5, Math.min(60, Number(clipSeconds) || 8)) * 1000;
     const durationSec = durationMs / 1000;
 
-    const playbackSegments = await buildPlaybackPlan(durationSec);
+    const playbackSegments = await Promise.race([
+      buildPlaybackPlan(durationSec),
+      timeoutAfter(15000, "Playback planning"),
+    ]).catch(() => []);
     const activeSegments = playbackSegments.length
       ? playbackSegments
       : (() => {
@@ -746,6 +773,10 @@ export default function App() {
             endSec: (idx + 1) * each,
           }));
         })();
+
+    if (!playbackSegments.length) {
+      setExportStatus("Recording with timed verse transitions (audio metadata unavailable).");
+    }
 
     const videoStream = canvas.captureStream(30);
     const tracks = [...videoStream.getVideoTracks()];
