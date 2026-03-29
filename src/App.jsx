@@ -390,29 +390,48 @@ export default function App() {
       lineEnglish = quranLines[idx]?.english || lineEnglish;
     }
 
-    ctx.fillStyle = T.textColor;
-    ctx.font = "bold 88px 'Amiri', serif";
-    ctx.textAlign = "center";
-    ctx.direction = "rtl";
-    const arabicLineCount = wrapText(ctx, lineArabic, W / 2, 340, W - 160, 110);
-    ctx.direction = "ltr";
-
-    const dividerY = 340 + arabicLineCount * 110 + 40;
-    ctx.fillStyle = T.accentColor;
-    ctx.fillRect(W / 2 - 80, dividerY, 160, 3);
-
-    if (lineEnglish) {
+    const drawVerseLayer = (layerArabic, layerEnglish, layerReference, alpha = 1) => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
       ctx.fillStyle = T.textColor;
-      ctx.font = "italic 52px 'Amiri', serif";
+      ctx.font = "bold 88px 'Amiri', serif";
       ctx.textAlign = "center";
-      wrapText(ctx, '"' + lineEnglish + '"', W / 2, dividerY + 80, W - 200, 72);
-    }
+      ctx.direction = "rtl";
+      const arabicLineCount = wrapText(ctx, layerArabic, W / 2, 340, W - 160, 110);
+      ctx.direction = "ltr";
 
-    if (activeReference) {
+      const dividerY = 340 + arabicLineCount * 110 + 40;
       ctx.fillStyle = T.accentColor;
-      ctx.font = "bold 44px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("— " + activeReference, W / 2, H - 280);
+      ctx.fillRect(W / 2 - 80, dividerY, 160, 3);
+
+      if (layerEnglish) {
+        ctx.fillStyle = T.textColor;
+        ctx.font = "italic 52px 'Amiri', serif";
+        ctx.textAlign = "center";
+        wrapText(ctx, '"' + layerEnglish + '"', W / 2, dividerY + 80, W - 200, 72);
+      }
+
+      if (layerReference) {
+        ctx.fillStyle = T.accentColor;
+        ctx.font = "bold 44px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("— " + layerReference, W / 2, H - 280);
+      }
+      ctx.restore();
+    };
+
+    const nextBlend = Math.max(0, Math.min(1, Number(lineOverride?.blend || 0)));
+    const nextLayer = lineOverride?.next;
+    if (nextLayer && nextBlend > 0) {
+      drawVerseLayer(lineArabic, lineEnglish, activeReference, 1 - nextBlend);
+      drawVerseLayer(
+        nextLayer.arabic || lineArabic,
+        nextLayer.english || lineEnglish,
+        nextLayer.reference || activeReference,
+        nextBlend,
+      );
+    } else {
+      drawVerseLayer(lineArabic, lineEnglish, activeReference, 1);
     }
 
     ctx.fillStyle = T.accentColor;
@@ -809,15 +828,30 @@ export default function App() {
       let lineOverride = null;
       if (activeSegments.length > 0) {
         const elapsedSec = elapsed / 1000;
-        const currentSegment = activeSegments.find((s) => elapsedSec >= s.startSec && elapsedSec < s.endSec)
-          || activeSegments[activeSegments.length - 1];
+        const currentIndex = activeSegments.findIndex((s) => elapsedSec >= s.startSec && elapsedSec < s.endSec);
+        const safeIndex = currentIndex >= 0 ? currentIndex : activeSegments.length - 1;
+        const currentSegment = activeSegments[safeIndex];
         const currentLine = quranLines[currentSegment?.lineIndex] || null;
         if (currentLine) {
           const refBase = surah.includes(":") ? surah.split(":")[0] : surah;
+          const nextSegment = activeSegments[safeIndex + 1] || null;
+          const nextLine = nextSegment ? (quranLines[nextSegment.lineIndex] || null) : null;
+          const segmentLength = Math.max(0.001, (currentSegment?.endSec || 0) - (currentSegment?.startSec || 0));
+          const segmentProgress = Math.max(0, Math.min(1, (elapsedSec - (currentSegment?.startSec || 0)) / segmentLength));
+          const fadeWindow = 0.3;
+          const blend = nextLine && segmentProgress > (1 - fadeWindow)
+            ? Math.min(1, (segmentProgress - (1 - fadeWindow)) / fadeWindow)
+            : 0;
           lineOverride = {
             arabic: currentLine.arabic || ayah,
             english: currentLine.english || translation,
             reference: `${refBase}:${currentSegment.ayahNo}`,
+            blend,
+            next: nextLine ? {
+              arabic: nextLine.arabic || ayah,
+              english: nextLine.english || translation,
+              reference: `${refBase}:${nextSegment.ayahNo}`,
+            } : null,
           };
         }
       }
