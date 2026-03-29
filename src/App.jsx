@@ -198,6 +198,10 @@ export default function App() {
     { id: "pan", label: "Slow Pan" },
     { id: "parallax", label: "Parallax" },
   ];
+  const MOTION_INTENSITIES = [
+    { id: "subtle", label: "Subtle" },
+    { id: "cinematic", label: "Cinematic" },
+  ];
 
   const [step, setStep] = useState(1);
   const [ayah, setAyah] = useState("");
@@ -208,6 +212,7 @@ export default function App() {
   const [reciterId, setReciterId] = useState("1");
   const [clipSeconds, setClipSeconds] = useState(8);
   const [motionEffect, setMotionEffect] = useState("none");
+  const [motionIntensity, setMotionIntensity] = useState("cinematic");
   const [quranLines, setQuranLines] = useState([]);
   const [lineStartAyahNo, setLineStartAyahNo] = useState(1);
   const [recitationUrl, setRecitationUrl] = useState("");
@@ -231,7 +236,7 @@ export default function App() {
 
   useEffect(() => {
     if (step >= 3) drawCanvasFrame();
-  }, [ayah, translation, surah, selectedTemplate, bgImageEl, quranLines, step]);
+  }, [ayah, translation, surah, selectedTemplate, bgImageEl, quranLines, step, motionEffect, motionIntensity]);
 
   async function fetchSurahAndAutofill(targetSurahNo, targetAyahNo = 1) {
     const parsedSurahNo = Number.parseInt(targetSurahNo, 10);
@@ -329,6 +334,7 @@ export default function App() {
     const H = canvas.height;
     const T = selectedTemplate;
     const motionProgress = durationMs > 0 ? Math.max(0, Math.min(1, elapsedMs / durationMs)) : 0;
+    const isCinematic = motionIntensity === "cinematic";
 
     if (bgImageEl) {
       let scale = 1;
@@ -336,14 +342,19 @@ export default function App() {
       let offsetY = 0;
 
       if (motionEffect === "zoom") {
-        scale = 1 + 0.2 * motionProgress;
+        scale = 1 + (isCinematic ? 0.28 : 0.16) * motionProgress;
       } else if (motionEffect === "pan") {
-        scale = 1.08;
-        offsetX = -40 + 80 * motionProgress;
+        scale = isCinematic ? 1.14 : 1.08;
+        offsetX = isCinematic
+          ? -72 + 144 * motionProgress
+          : -40 + 80 * motionProgress;
       } else if (motionEffect === "parallax") {
-        scale = 1.12;
-        offsetX = -24 + 48 * motionProgress;
-        offsetY = Math.sin(motionProgress * Math.PI * 2) * 6;
+        const waveCycles = isCinematic ? 2.2 : 1.2;
+        scale = isCinematic ? 1.18 : 1.12;
+        offsetX = isCinematic
+          ? -90 + 180 * motionProgress
+          : -24 + 48 * motionProgress;
+        offsetY = Math.sin(motionProgress * Math.PI * 2 * waveCycles) * (isCinematic ? 10 : 6);
       }
 
       const drawW = W * scale;
@@ -982,17 +993,33 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div className="deen-panel p-4 max-w-md mx-auto mb-6">
-              <p className="text-xs text-slate-400 uppercase tracking-wide font-bold mb-3">Motion Effect</p>
-              <select
-                className="w-full bg-slate-900/80 border border-slate-600/60 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400/70"
-                value={motionEffect}
-                onChange={(e) => setMotionEffect(e.target.value)}
-              >
-                {MOTION_EFFECTS.map((effect) => (
-                  <option key={effect.id} value={effect.id}>{effect.label}</option>
-                ))}
-              </select>
+            <div className="deen-panel p-4 max-w-xl mx-auto mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide font-bold mb-3">Motion Effect</p>
+                  <select
+                    className="w-full bg-slate-900/80 border border-slate-600/60 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400/70"
+                    value={motionEffect}
+                    onChange={(e) => setMotionEffect(e.target.value)}
+                  >
+                    {MOTION_EFFECTS.map((effect) => (
+                      <option key={effect.id} value={effect.id}>{effect.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide font-bold mb-3">Motion Intensity</p>
+                  <select
+                    className="w-full bg-slate-900/80 border border-slate-600/60 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400/70"
+                    value={motionIntensity}
+                    onChange={(e) => setMotionIntensity(e.target.value)}
+                  >
+                    {MOTION_INTENSITIES.map((intensity) => (
+                      <option key={intensity.id} value={intensity.id}>{intensity.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
             <div className="flex gap-3 max-w-sm mx-auto">
               <button onClick={() => setStep(1)} className="flex-1 deen-panel py-3 rounded-xl text-sm text-slate-300 hover:border-slate-500 transition-all">← Back</button>
