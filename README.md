@@ -33,7 +33,7 @@ Transform Islamic teachings into stunning short-form vertical videos with AI-gen
 - **MediaRecorder API** - WebM to MP4 video export
 - **Real-time Progress Tracking** - 90-second export timeout with live % feedback
 
-### Backend (Optional)
+### Backend
 - **Serverless Functions** - `/api/generate-image.js`, `/api/generate-caption.js`
 - **Environment Variables** - `.env` for secure API key management
 
