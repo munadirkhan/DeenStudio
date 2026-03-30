@@ -147,8 +147,7 @@ DeenStudio/
 └── vite.config.js           # Vite configuration
 ```
 
-**Live on GitHub**: [munadirkhan/DeenStudio](https://github.com/munadirkhan/DeenStudio)
-
+**Live on VERCEL**: https://deen-studio.vercel.app 
 ## 📄 License
 
 Built with ❤️ for Islamic education and community engagement.
